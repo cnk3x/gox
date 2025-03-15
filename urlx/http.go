@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cnk3x/gox/files"
+	"github.com/cnk3x/gox/fss"
 	"github.com/cnk3x/gox/strs"
 )
 
@@ -176,7 +176,7 @@ func SaveResponse(to string, reportFn ...func(cur, total int64)) RequestOption {
 			}
 		}
 
-		if err = files.SaveFile(temp, resp.Body, reports...); err != nil {
+		if err = fss.SaveFile(temp, resp.Body, reports...); err != nil {
 			return
 		}
 

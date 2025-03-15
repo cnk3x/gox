@@ -20,10 +20,10 @@ func MakeChan[T any](size ...int) (ch chan T, closech func()) {
 }
 
 // StructChan make a unbuffered struct{} channel
-func StructChan() (ch chan struct{}, closech func()) { return MakeChan[struct{}]() }
+func StructChan(size ...int) (ch chan struct{}, closech func()) { return MakeChan[struct{}](size...) }
 
-// AfterChan  will invoke fn when ch done, but cancel when ctx done or invoke cancel function
-func AfterChan[T any](ctx context.Context, ch <-chan T, fn func(), cancelable ...bool) (cancel func()) {
+// AfterChanWithContext  will invoke fn when ch done, but cancel when ctx done or invoke cancel function
+func AfterChanWithContext[T any](ctx context.Context, ch <-chan T, fn func(), cancelable ...bool) (cancel func()) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -44,6 +44,11 @@ func AfterChan[T any](ctx context.Context, ch <-chan T, fn func(), cancelable ..
 	}()
 
 	return
+}
+
+// AfterChan  will invoke fn when ch done, but cancel when ctx done or invoke cancel function
+func AfterChan[T any](ch <-chan T, fn func(), cancelable ...bool) (cancel func()) {
+	return AfterChanWithContext(context.Background(), ch, fn, cancelable...)
 }
 
 // AfterContext  will invoke fn when ctx done, but cancel when invoke cancel function
@@ -72,7 +77,7 @@ func AfterContext(ctx context.Context, fn func(), cancelable ...bool) (cancel fu
 }
 
 // AfterTime will invoke fn after d, but cancel when ctx done or invoke cancel function
-func AfterTime(ctx context.Context, d time.Duration, fn func(), cancelable ...bool) (cancel func()) {
+func AfterTimeWithContext(ctx context.Context, d time.Duration, fn func(), cancelable ...bool) (cancel func()) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -92,6 +97,11 @@ func AfterTime(ctx context.Context, d time.Duration, fn func(), cancelable ...bo
 	}()
 
 	return
+}
+
+// AfterTime will invoke fn after d, but cancel when ctx done or invoke cancel function
+func AfterTime(d time.Duration, fn func(), cancelable ...bool) (cancel func()) {
+	return AfterTimeWithContext(context.Background(), d, fn, cancelable...)
 }
 
 // Sleep sleeps for the specified duration. It returns false if the context is canceled.

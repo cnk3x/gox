@@ -9,9 +9,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 	"time"
 
+	"github.com/cnk3x/gox/chans"
+	"github.com/cnk3x/gox/fss"
 	"github.com/cnk3x/gox/strs"
 
 	"github.com/valyala/fasttemplate"
@@ -30,15 +31,15 @@ type Options struct {
 	Dir          string        `json:"dir,omitempty" yaml:"dir,omitempty"`
 	Env          []string      `json:"env,omitempty" yaml:"env,omitempty"`
 	RestartDelay time.Duration `json:"restart_delay,omitempty" yaml:"restart_delay,omitempty"`
-	Logger       Logger        `json:"logger,omitempty" yaml:"logger,omitempty"`
+	Logger       *Logger       `json:"logger,omitempty" yaml:"logger,omitempty"`
 
 	PreStart []func(c *exec.Cmd) error `json:"-" yaml:"-"`
 }
 
 type Logger struct {
-	RotateOptions `json:",inline" yaml:",inline"`
-	Stderr        RotateOptions `json:"stderr,omitempty" yaml:"stderr,omitempty"`
-	Stdout        RotateOptions `json:"stdout,omitempty" yaml:"stdout,omitempty"`
+	*RotateOptions `json:",inline" yaml:",inline"`
+	Stderr         *RotateOptions `json:"stderr,omitempty" yaml:"stderr,omitempty"`
+	Stdout         *RotateOptions `json:"stdout,omitempty" yaml:"stdout,omitempty"`
 }
 
 // Status is a status code.
@@ -105,8 +106,8 @@ func WithOptions(options Options) Option {
 
 func cmdRun(ctx context.Context, options Options) (s *Result) {
 	var (
-		allDone, closeAllDone = structchan()
-		statusc, closeStatusc = makechan[Status](5)
+		allDone, closeAllDone = chans.StructChan()
+		statusc, closeStatusc = chans.MakeChan[Status](5)
 		pDone                 <-chan struct{}
 		pCancel               context.CancelFunc
 	)
@@ -142,20 +143,23 @@ func cmdRun(ctx context.Context, options Options) (s *Result) {
 			env      = Env(os.Environ()).Sets(strReplAll(options.Env, replArgs)...)
 		)
 
+		done, closeDone := chans.StructChan()
+		pDone = done
+
 		ctx, cancel := context.WithCancel(ctx)
 		pCancel = cancel
+		chans.AfterChan(done, cancel)
 
 		c := setProcessGroup(exec.CommandContext(ctx, execute, args...))
 		c.Dir, c.Env = dir, env
 		c.Cancel = func() error { return terminateProcess(c.Process.Pid) }
 
-		loggerFactory := createLoggerFactory()
-		c.Stdout = loggerFactory.New(options.Logger.Stdout, options.Logger.RotateOptions)
-		c.Stderr = loggerFactory.New(options.Logger.Stderr, options.Logger.RotateOptions)
-
-		done, closeDone := structchan()
-		pDone = done
-		afterDone(done, func() { loggerFactory.Close(); cancel() })
+		if options.Logger != nil {
+			loggerFactory := createLoggerFactory()
+			c.Stdout = loggerFactory.Create(options.Logger.Stdout, options.Logger.RotateOptions)
+			c.Stderr = loggerFactory.Create(options.Logger.Stderr, options.Logger.RotateOptions)
+			chans.AfterChan(done, fss.NoErr(loggerFactory))
+		}
 
 		s.Command = c.String()
 
@@ -163,7 +167,7 @@ func cmdRun(ctx context.Context, options Options) (s *Result) {
 			statusUpdate(StatusStarting)
 		}
 
-		started, closeStarted := structchan()
+		started, closeStarted := chans.StructChan()
 		go func() {
 			defer closeDone()
 
@@ -238,20 +242,25 @@ func cmdRun(ctx context.Context, options Options) (s *Result) {
 /** logger **/
 
 type LoggerFactory struct {
-	New   func(options ...RotateOptions) (w io.Writer)
-	Close func() error
+	create func(options ...*RotateOptions) (w io.Writer)
+	close  func() error
 }
+
+func (f LoggerFactory) Create(options ...*RotateOptions) io.Writer { return f.create(options...) }
+func (f LoggerFactory) Close() error                               { return f.close() }
 
 func createLoggerFactory() (factory LoggerFactory) {
 	writers := make(map[string]io.WriteCloser, 2)
 
-	factory.New = func(options ...RotateOptions) (w io.Writer) {
+	factory.create = func(options ...*RotateOptions) (w io.Writer) {
 		var opts RotateOptions
 		for _, it := range options {
-			opts.Path = cmp.Or(strs.TrimSpace(opts.Path), strs.TrimSpace(it.Path))
-			opts.MaxBackups = cmp.Or(opts.MaxBackups, it.MaxBackups)
-			opts.MaxSize = cmp.Or(opts.MaxSize, it.MaxSize)
-			opts.Std = cmp.Or(opts.Std, it.Std)
+			if it != nil {
+				opts.Path = cmp.Or(strs.TrimSpace(opts.Path), strs.TrimSpace(it.Path))
+				opts.MaxBackups = cmp.Or(opts.MaxBackups, it.MaxBackups)
+				opts.MaxSize = cmp.Or(opts.MaxSize, it.MaxSize)
+				opts.Std = cmp.Or(opts.Std, it.Std)
+			}
 		}
 
 		if p := strs.Lower(opts.Path); p != "" {
@@ -283,7 +292,7 @@ func createLoggerFactory() (factory LoggerFactory) {
 		return
 	}
 
-	factory.Close = func() (err error) {
+	factory.close = func() (err error) {
 		var errs []error
 		for writer := range maps.Values(writers) {
 			errs = append(errs, writer.Close())
@@ -354,22 +363,3 @@ func Elapsed(t ...time.Time) time.Duration {
 
 	return end.Sub(start)
 }
-
-func afterDone(done <-chan struct{}, f func()) {
-	go func() {
-		<-done
-		f()
-	}()
-}
-
-func makechan[T any](size ...int) (ch chan T, closech func()) {
-	if len(size) > 0 {
-		ch = make(chan T, size[0])
-	} else {
-		ch = make(chan T)
-	}
-	closech = sync.OnceFunc(func() { close(ch) })
-	return
-}
-
-var structchan = makechan[struct{}]

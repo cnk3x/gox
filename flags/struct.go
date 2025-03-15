@@ -31,65 +31,54 @@ func FlagStruct(structObj any, options ...func(so *StructOptions)) FlagOption {
 	return func(fs *FlagSet) { addStruct(fs, structObj, so) }
 }
 
-func addStruct(fs *FlagSet, structObj any, so StructOptions) {
+func addStruct(fs *FlagSet, structObj any, options StructOptions) {
 	rv := reflect.Indirect(reflect.ValueOf(structObj))
 	rt := rv.Type()
 
 	for i := range rt.NumField() {
 		field := rt.Field(i)
 
-		if !field.IsExported() {
+		if !field.IsExported() || !allowType(field.Type, true) {
 			continue
 		}
 
-		fv, fk := rv.Field(i), field.Type.Kind()
-		if fk == reflect.Pointer {
-			if fv.IsNil() {
-				fv.Set(reflect.New(field.Type.Elem()))
-			}
-			fv = fv.Elem()
-			fk = field.Type.Elem().Kind()
+		fv, ft := rv.Field(i), field.Type
+
+		if !makeIfNil(rv.Field(i), ft) {
+			continue
 		}
 
 		if field.Anonymous {
-			if fk == reflect.Struct {
-				addStruct(fs, fv.Interface(), so)
+			if mayStruct(ft) {
+				addStruct(fs, fv.Interface(), options)
 			}
 			continue
 		}
 
-		name := field.Tag.Get("flag")
-		if name == "-" {
-			continue
-		}
-
-		if name == "" {
-			name = strs.Lower(field.Name)
-		}
-
-		if so.NamePrefix != "" {
-			name = so.NamePrefix + "." + name
-		}
-
-		env := field.Tag.Get("env")
-		if env == "" {
-			env = strs.Replace(strs.Upper(name), "-", "_")
-		}
-		if env != "-" {
-			if so.EnvPrefix != "" {
-				env = so.EnvPrefix + "_" + env
+		if name, inline, short, usage, env, def := tagReslove(field, options); name != "-" {
+			if mayStruct(ft) {
+				if inline {
+					addStruct(fs, fv.Interface(), options)
+				} else {
+					addStruct(fs, fv.Interface(), StructOptions{NamePrefix: name, EnvPrefix: env})
+				}
+			} else {
+				if v, ok := rPointer(fv); ok {
+					if def != "" {
+						strs.AnySet(v.Interface(), def, false)
+					}
+					addFlag(fs, v.Interface(), name, short, usage, env)
+				}
 			}
-		}
-
-		if fk == reflect.Struct {
-			addStruct(fs, fv.Interface(), StructOptions{NamePrefix: name, EnvPrefix: env})
-		} else {
-			addFlag(fs, fv.Addr().Interface(), name, field.Tag.Get("short"), field.Tag.Get("usage"), env)
 		}
 	}
 }
 
 func addFlag(fs *FlagSet, val any, name, short, usage, env string) {
+	if usage == "" {
+		usage = strs.Replace(name, ".", " ")
+	}
+
 	if env != "-" && env != "" {
 		usage += fmt.Sprintf(" (env: %s)", env)
 		if envVal, envOk := os.LookupEnv(env); envOk {
@@ -151,4 +140,105 @@ func addFlag(fs *FlagSet, val any, name, short, usage, env string) {
 	case *[]time.Duration:
 		fs.DurationSliceVarP(x, name, short, *x, usage)
 	}
+}
+
+func tagReslove(field reflect.StructField, sOpt StructOptions) (name string, inline bool, short, usage, env, def string) {
+	// name reslove
+	if name = field.Tag.Get("flag"); name == "-" {
+		return
+	}
+
+	if inline = name == ",inline"; inline {
+		return
+	}
+
+	if name == "" {
+		name = strs.Lower(field.Name)
+	}
+
+	// env reslove
+	if env = field.Tag.Get("env"); env != "-" {
+		if env == "" {
+			env = strs.Replace(strs.Upper(name), "-", "_")
+		}
+		if sOpt.EnvPrefix != "" {
+			env = sOpt.EnvPrefix + "_" + env
+		}
+	}
+
+	// add name prefix
+	if sOpt.NamePrefix != "" {
+		name = sOpt.NamePrefix + "." + name
+	}
+
+	short, usage, def = field.Tag.Get("short"), field.Tag.Get("usage"), field.Tag.Get("default")
+	return
+}
+
+func allowType(ft reflect.Type, checkElem bool) bool {
+	switch ft.Kind() {
+	case reflect.Bool:
+		return true
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return true
+	case reflect.Float32, reflect.Float64:
+		return true
+	case reflect.String:
+		return true
+	case reflect.Struct:
+		return true
+	case reflect.Pointer:
+		return checkElem && allowType(ft.Elem(), false)
+	case reflect.Slice:
+		return checkElem && allowType(ft.Elem(), false)
+	default:
+		return false
+	}
+}
+
+func makeIfNil(v reflect.Value, t reflect.Type) bool {
+	var isNil bool
+	k := v.Kind()
+	switch k {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		isNil = v.IsNil()
+	default:
+		isNil = false
+	}
+
+	if isNil {
+		switch t.Kind() {
+		case reflect.Pointer:
+			v.Set(reflect.New(t.Elem()))
+		case reflect.Slice:
+			v.Set(reflect.MakeSlice(t, 0, 0))
+		default:
+			return false
+		}
+	}
+
+	return true
+}
+
+func typeIndirect(v reflect.Type) reflect.Type {
+	for v.Kind() == reflect.Pointer {
+		v = v.Elem()
+	}
+	return v
+}
+
+func mayStruct(t reflect.Type) bool { return typeIndirect(t).Kind() == reflect.Struct }
+
+func rPointer(v reflect.Value) (reflect.Value, bool) {
+	if v.Kind() == reflect.Pointer {
+		return v, true
+	}
+
+	if v.CanAddr() {
+		return v.Addr(), true
+	}
+
+	return v, false
 }

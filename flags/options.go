@@ -13,6 +13,8 @@ type (
 	FlagOption func(*FlagSet) // FlagOption flag option
 )
 
+func (fo FlagOption) Apply(fs *FlagSet) { fo(fs) }
+
 // Options options
 func Options(options ...Option) Option {
 	return func(c *Command) {
