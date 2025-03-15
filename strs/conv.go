@@ -80,7 +80,9 @@ func Bool[T ~bool](s string, def ...T) (r T) {
 	return
 }
 
-func NumSet[T, R Ints | Uints | Floats](dst *R) (setter struct{ Set func(T, error) }) {
+type Setter[T any] struct{ Set func(T, error) }
+
+func NumSet[T, R Ints | Uints | Floats](dst *R) (setter Setter[T]) {
 	setter.Set = func(val T, err error) {
 		if err == nil {
 			*dst = R(val)
@@ -89,7 +91,7 @@ func NumSet[T, R Ints | Uints | Floats](dst *R) (setter struct{ Set func(T, erro
 	return
 }
 
-func SameSet[T any](dst *T) (setter struct{ Set func(T, error) }) {
+func SameSet[T any](dst *T) (setter Setter[T]) {
 	setter.Set = func(val T, err error) {
 		if err == nil {
 			*dst = val
@@ -98,7 +100,7 @@ func SameSet[T any](dst *T) (setter struct{ Set func(T, error) }) {
 	return
 }
 
-func ArrSet[T, R Ints | Uints | Floats](dst *[]R, valueAppend bool) (setter struct{ Set func(T, error) }) {
+func Sets[T, R Ints | Uints | Floats](dst *[]R, valueAppend bool) (setter Setter[T]) {
 	setter.Set = func(t T, err error) {
 		if err == nil {
 			if valueAppend {
@@ -111,7 +113,7 @@ func ArrSet[T, R Ints | Uints | Floats](dst *[]R, valueAppend bool) (setter stru
 	return
 }
 
-func ArrSameSet[T any](dst *[]T, valueAppend bool) (setter struct{ Set func(T, error) }) {
+func SameSets[T any](dst *[]T, valueAppend bool) (setter Setter[T]) {
 	setter.Set = func(t T, err error) {
 		if err == nil {
 			if valueAppend {
@@ -159,7 +161,7 @@ func AnySet(dst any, val string, valueAppend bool) {
 	case *time.Duration:
 		SameSet(x).Set(ParseDuration(val))
 	case *[]bool:
-		ArrSameSet(x, valueAppend).Set(strconv.ParseBool(val))
+		SameSets(x, valueAppend).Set(strconv.ParseBool(val))
 	case *[]string:
 		if valueAppend {
 			*x = append(*x, val)
@@ -167,21 +169,21 @@ func AnySet(dst any, val string, valueAppend bool) {
 			*x = []string{val}
 		}
 	case *[]int:
-		ArrSameSet(x, valueAppend).Set(strconv.Atoi(val))
+		SameSets(x, valueAppend).Set(strconv.Atoi(val))
 	case *[]int32:
-		ArrSet[int64](x, valueAppend).Set(strconv.ParseInt(val, 0, 32))
+		Sets[int64](x, valueAppend).Set(strconv.ParseInt(val, 0, 32))
 	case *[]int64:
-		ArrSameSet(x, valueAppend).Set(strconv.ParseInt(val, 0, 64))
+		SameSets(x, valueAppend).Set(strconv.ParseInt(val, 0, 64))
 	case *[]uint:
-		ArrSet[uint64](x, valueAppend).Set(strconv.ParseUint(val, 0, 32))
+		Sets[uint64](x, valueAppend).Set(strconv.ParseUint(val, 0, 32))
 	case *[]float32:
-		ArrSet[float64](x, valueAppend).Set(strconv.ParseFloat(val, 32))
+		Sets[float64](x, valueAppend).Set(strconv.ParseFloat(val, 32))
 	case *[]float64:
-		ArrSameSet(x, valueAppend).Set(strconv.ParseFloat(val, 64))
+		SameSets(x, valueAppend).Set(strconv.ParseFloat(val, 64))
 	case *[]net.IP:
-		ArrSameSet(x, valueAppend).Set(ParseIP(val))
+		SameSets(x, valueAppend).Set(ParseIP(val))
 	case *[]time.Duration:
-		ArrSameSet(x, valueAppend).Set(ParseDuration(val))
+		SameSets(x, valueAppend).Set(ParseDuration(val))
 	}
 }
 
