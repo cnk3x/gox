@@ -9,8 +9,10 @@ import (
 
 var rootCmd = &Command{}
 
+var NameDefault = strs.TrimExe(filepath.Base(os.Args[0]))
+
 func init() {
-	rootCmd = &Command{Use: strs.TrimExe(filepath.Base(os.Args[0]))}
+	rootCmd = &Command{Use: NameDefault}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
 
