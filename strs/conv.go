@@ -15,6 +15,7 @@ type (
 	Uints interface {
 		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
 	}
+	Floats interface{ ~float32 | ~float64 }
 )
 
 // Bytes 使用 unsafe 将 string 转换为 []byte
