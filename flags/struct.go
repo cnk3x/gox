@@ -28,57 +28,63 @@ func FlagStruct(structObj any, options ...func(so *StructOptions)) FlagOption {
 	for _, fn := range options {
 		fn(&so)
 	}
-	return addStruct(structObj, so)
+	return func(fs *FlagSet) { addStruct(fs, structObj, so) }
 }
 
-func addStruct(structObj any, so StructOptions) FlagOption {
-	return func(fs *FlagSet) {
-		rv := reflect.Indirect(reflect.ValueOf(structObj))
-		rt := rv.Type()
+func addStruct(fs *FlagSet, structObj any, so StructOptions) {
+	rv := reflect.Indirect(reflect.ValueOf(structObj))
+	rt := rv.Type()
 
-		for i := range rt.NumField() {
-			field := rt.Field(i)
-			if field.PkgPath != "" {
-				continue
-			}
+	for i := range rt.NumField() {
+		field := rt.Field(i)
 
-			name := field.Tag.Get("flag")
-			if name == "-" {
-				continue
-			}
+		if !field.IsExported() {
+			continue
+		}
 
-			if name == "" {
-				name = strs.Lower(field.Name)
+		fv, fk := rv.Field(i), field.Type.Kind()
+		if fk == reflect.Pointer {
+			if fv.IsNil() {
+				fv.Set(reflect.New(field.Type.Elem()))
 			}
+			fv = fv.Elem()
+			fk = field.Type.Elem().Kind()
+		}
 
-			if so.NamePrefix != "" {
-				name = so.NamePrefix + "." + name
+		if field.Anonymous {
+			if fk == reflect.Struct {
+				addStruct(fs, fv.Interface(), so)
 			}
+			continue
+		}
 
-			env := field.Tag.Get("env")
-			if env == "" {
-				env = strs.Replace(strs.Upper(name), "-", "_")
-			}
-			if env != "-" {
-				if so.EnvPrefix != "" {
-					env = so.EnvPrefix + "_" + env
-				}
-			}
+		name := field.Tag.Get("flag")
+		if name == "-" {
+			continue
+		}
 
-			fv := rv.Field(i)
-			fk := field.Type.Kind()
-			if fk == reflect.Pointer {
-				if fv.IsNil() {
-					fv.Set(reflect.New(field.Type.Elem()))
-				}
-				fv = fv.Elem()
-			}
+		if name == "" {
+			name = strs.Lower(field.Name)
+		}
 
-			if field.Type.Kind() == reflect.Struct {
-				addStruct(fv.Interface(), StructOptions{NamePrefix: name, EnvPrefix: env})
-			} else {
-				addFlag(fs, fv.Addr().Interface(), name, field.Tag.Get("short"), field.Tag.Get("usage"), env)
+		if so.NamePrefix != "" {
+			name = so.NamePrefix + "." + name
+		}
+
+		env := field.Tag.Get("env")
+		if env == "" {
+			env = strs.Replace(strs.Upper(name), "-", "_")
+		}
+		if env != "-" {
+			if so.EnvPrefix != "" {
+				env = so.EnvPrefix + "_" + env
 			}
+		}
+
+		if fk == reflect.Struct {
+			addStruct(fs, fv.Interface(), StructOptions{NamePrefix: name, EnvPrefix: env})
+		} else {
+			addFlag(fs, fv.Addr().Interface(), name, field.Tag.Get("short"), field.Tag.Get("usage"), env)
 		}
 	}
 }
