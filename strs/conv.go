@@ -8,10 +8,12 @@ import (
 )
 
 type (
-	Strs  interface{ ~string | ~[]byte }
-	Ints  interface{ ~int | ~int8 | ~int16 | ~int64 }
+	Strs interface{ ~string | ~[]byte }
+	Ints interface {
+		~int | ~int8 | ~int16 | ~int32 | ~int64
+	}
 	Uints interface {
-		~uint | ~uint8 | ~uint16 | ~uint64
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
 	}
 )
 
