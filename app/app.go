@@ -17,8 +17,7 @@ type App interface {
 
 func Run(app App, options ...flags.Option) {
 	flags.RootSet(
-		flags.FlagStructOption(flags.EnvPrefix(strs.Upper(strs.TrimExe(os.Args[0])))),
-		flags.FlagStruct(app),
+		flags.FlagStruct(app, flags.EnvPrefix(strs.Upper(strs.TrimExe(os.Args[0])))),
 		flags.Run(func(c *flags.Command) {
 			ctx, cancel := signal.NotifyContext(c.Context(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()

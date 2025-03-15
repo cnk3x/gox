@@ -12,7 +12,7 @@ func TestStruct(t *testing.T) {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 	var cfg Config
 	flagSet := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	FlagStruct(&cfg, NamePrefix("test"), EnvPrefix("TEST")).Apply(flagSet)
+	Struct(&cfg, NamePrefix("test"), EnvPrefix("TEST"))(flagSet)
 	flagSet.Parse([]string{"--help"})
 }
 

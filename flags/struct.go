@@ -10,8 +10,6 @@ import (
 	"github.com/cnk3x/gox/strs"
 )
 
-var globalStructOptions []StructOption
-
 type (
 	StructOption  func(*StructOptions)
 	StructOptions struct {
@@ -19,12 +17,6 @@ type (
 		NamePrefix string
 	}
 )
-
-func FlagStructOption(options ...StructOption) Option {
-	return func(*Command) {
-		globalStructOptions = append(globalStructOptions, options...)
-	}
-}
 
 func FlagStruct(structObj any, options ...StructOption) Option {
 	return Flags(Struct(structObj, options...))
@@ -40,9 +32,6 @@ func NamePrefix(prefix string) StructOption {
 
 func Struct(structObj any, options ...StructOption) FlagOption {
 	var so StructOptions
-	for _, fn := range globalStructOptions {
-		fn(&so)
-	}
 	for _, fn := range options {
 		fn(&so)
 	}
