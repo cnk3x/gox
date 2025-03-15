@@ -17,6 +17,7 @@ func init() {
 }
 
 func Execute() {
+	hideHelp(rootCmd)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -35,4 +36,18 @@ func AddCommand(use string, options ...Option) *Command {
 	}
 	rootCmd.AddCommand(c)
 	return c
+}
+
+func hideHelp(c *Command) {
+	c.InitDefaultHelpFlag()
+	c.InitDefaultHelpCmd()
+	c.Flags().MarkHidden("help")
+	c.PersistentFlags().MarkHidden("help")
+	for _, sub := range c.Commands() {
+		if sub.Name() == "help" {
+			sub.Hidden = true
+		} else {
+			hideHelp(sub)
+		}
+	}
 }

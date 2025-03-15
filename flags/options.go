@@ -86,23 +86,36 @@ func Example(example string) Option {
 // to this command (local and persistent declared here and by all parents).
 func Flags(sets ...FlagOption) Option {
 	return func(c *Command) {
-		flag := c.Flags()
-		flag.MarkHidden("help")
-		flag.SortFlags = false
+		f := c.Flags()
 		for _, set := range sets {
-			set(flag)
+			set(f)
 		}
 	}
+}
+
+func SortFlags(enabled bool) Option {
+	return Flags(func(fs *FlagSet) { fs.SortFlags = enabled })
 }
 
 // PersistentFlags returns the persistent FlagSet specifically set in the current command.
 func PersistentFlags(sets ...FlagOption) Option {
 	return func(c *Command) {
-		flag := c.PersistentFlags()
-		flag.MarkHidden("help")
-		flag.SortFlags = false
+		f := c.PersistentFlags()
 		for _, set := range sets {
-			set(flag)
+			set(f)
+		}
+	}
+}
+
+func SortPersistentFlags(enabled bool) Option {
+	return PersistentFlags(func(fs *FlagSet) { fs.SortFlags = enabled })
+}
+
+func MarkHidden(names ...string) Option {
+	return func(c *Command) {
+		flag := c.Flags()
+		for _, name := range names {
+			flag.MarkHidden(name)
 		}
 	}
 }
