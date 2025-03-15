@@ -108,7 +108,7 @@ func Var[T VarT](name, short string, val T, usage, env string) FlagOption {
 
 // Val is a helper function to add a variable to the flag set.
 func Val[T VarT](val *T, name, short string, usage, env string) FlagOption {
-	return func(fs *FlagSet) { addFlag(fs, val, name, short, usage, env) }
+	return func(fs *FlagSet) { anyFlag(fs, val, name, short, usage, env) }
 }
 
 // VarT is the type of the variable to be added to the flag set.

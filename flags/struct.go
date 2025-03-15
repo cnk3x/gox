@@ -28,17 +28,17 @@ func FlagStruct(structObj any, options ...func(so *StructOptions)) FlagOption {
 	for _, fn := range options {
 		fn(&so)
 	}
-	return func(fs *FlagSet) { addStruct(fs, structObj, so) }
+	return func(fs *FlagSet) { addStruct(fs, reflect.ValueOf(structObj), so) }
 }
 
-func addStruct(fs *FlagSet, structObj any, options StructOptions) {
-	rv := reflect.Indirect(reflect.ValueOf(structObj))
+func addStruct(fs *FlagSet, rv reflect.Value, options StructOptions) {
+	rv = reflect.Indirect(rv)
 	rt := rv.Type()
 
 	for i := range rt.NumField() {
 		field := rt.Field(i)
 
-		if !field.IsExported() || !allowType(field.Type, true) {
+		if !field.IsExported() || !typeSupport(field.Type, true) {
 			continue
 		}
 
@@ -50,31 +50,31 @@ func addStruct(fs *FlagSet, structObj any, options StructOptions) {
 
 		if field.Anonymous {
 			if mayStruct(ft) {
-				addStruct(fs, fv.Interface(), options)
+				addStruct(fs, fv, options)
 			}
 			continue
 		}
 
-		if name, inline, short, usage, env, def := tagReslove(field, options); name != "-" {
+		if name, inline, short, usage, env, value := resloveTags(field, options); name != "-" {
 			if mayStruct(ft) {
 				if inline {
-					addStruct(fs, fv.Interface(), options)
+					addStruct(fs, fv, options)
 				} else {
-					addStruct(fs, fv.Interface(), StructOptions{NamePrefix: name, EnvPrefix: env})
+					addStruct(fs, fv, StructOptions{NamePrefix: name, EnvPrefix: env})
 				}
 			} else {
-				if v, ok := rPointer(fv); ok {
-					if def != "" {
-						strs.AnySet(v.Interface(), def, false)
+				if a, ok := getAddrInterface(fv); ok {
+					if value != "" {
+						strs.AnySet(a, value, false)
 					}
-					addFlag(fs, v.Interface(), name, short, usage, env)
+					anyFlag(fs, a, name, short, usage, env)
 				}
 			}
 		}
 	}
 }
 
-func addFlag(fs *FlagSet, val any, name, short, usage, env string) {
+func anyFlag(fs *FlagSet, val any, name, short, usage, env string) {
 	if usage == "" {
 		usage = strs.Replace(name, ".", " ")
 	}
@@ -142,7 +142,7 @@ func addFlag(fs *FlagSet, val any, name, short, usage, env string) {
 	}
 }
 
-func tagReslove(field reflect.StructField, sOpt StructOptions) (name string, inline bool, short, usage, env, def string) {
+func resloveTags(field reflect.StructField, sOpt StructOptions) (name string, inline bool, short, usage, env, def string) {
 	// name reslove
 	if name = field.Tag.Get("flag"); name == "-" {
 		return
@@ -175,7 +175,7 @@ func tagReslove(field reflect.StructField, sOpt StructOptions) (name string, inl
 	return
 }
 
-func allowType(ft reflect.Type, checkElem bool) bool {
+func typeSupport(ft reflect.Type, checkElem bool) bool {
 	switch ft.Kind() {
 	case reflect.Bool:
 		return true
@@ -190,9 +190,9 @@ func allowType(ft reflect.Type, checkElem bool) bool {
 	case reflect.Struct:
 		return true
 	case reflect.Pointer:
-		return checkElem && allowType(ft.Elem(), false)
+		return checkElem && typeSupport(ft.Elem(), false)
 	case reflect.Slice:
-		return checkElem && allowType(ft.Elem(), false)
+		return checkElem && typeSupport(ft.Elem(), false)
 	default:
 		return false
 	}
@@ -209,6 +209,9 @@ func makeIfNil(v reflect.Value, t reflect.Type) bool {
 	}
 
 	if isNil {
+		if !v.CanSet() {
+			return false
+		}
 		switch t.Kind() {
 		case reflect.Pointer:
 			v.Set(reflect.New(t.Elem()))
@@ -231,14 +234,14 @@ func typeIndirect(v reflect.Type) reflect.Type {
 
 func mayStruct(t reflect.Type) bool { return typeIndirect(t).Kind() == reflect.Struct }
 
-func rPointer(v reflect.Value) (reflect.Value, bool) {
+func getAddrInterface(v reflect.Value) (any, bool) {
 	if v.Kind() == reflect.Pointer {
-		return v, true
+		return v.Interface(), true
 	}
 
 	if v.CanAddr() {
-		return v.Addr(), true
+		return v.Addr().Interface(), true
 	}
 
-	return v, false
+	return nil, false
 }
