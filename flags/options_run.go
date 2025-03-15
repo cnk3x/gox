@@ -1,9 +1,12 @@
 package flags
 
+import "context"
+
 // RunFunc cobra run
 type RunFunc interface {
-	func() | func(args []string) | func(*Command, []string) | func(*Command) |
-		func() error | func(args []string) error | func(*Command, []string) error | func(*Command) error
+	func() | func([]string) | func(*Command, []string) | func(*Command) |
+		func() error | func([]string) error | func(*Command, []string) error | func(*Command) error |
+		func(context.Context) | func(context.Context) error | func(context.Context, []string) error
 }
 
 func buildCobraRun[F RunFunc](fn F) func(*Command, []string) error {
@@ -25,6 +28,12 @@ func buildCobraRun[F RunFunc](fn F) func(*Command, []string) error {
 			return f(cmd, args)
 		case func(*Command) error:
 			return f(cmd)
+		case func(context.Context):
+			f(cmd.Context())
+		case func(context.Context) error:
+			return f(cmd.Context())
+		case func(context.Context, []string) error:
+			return f(cmd.Context(), args)
 		}
 		return nil
 	}

@@ -10,21 +10,35 @@ import (
 	"github.com/cnk3x/gox/strs"
 )
 
-type StructOptions struct {
-	EnvPrefix  string
-	NamePrefix string
+var globalStructOptions []StructOption
+
+type (
+	StructOption  func(*StructOptions)
+	StructOptions struct {
+		EnvPrefix  string
+		NamePrefix string
+	}
+)
+
+func Struct(options ...StructOption) Option {
+	return func(*Command) {
+		globalStructOptions = append(globalStructOptions, options...)
+	}
 }
 
-func EnvPrefix(prefix string) func(so *StructOptions) {
+func EnvPrefix(prefix string) StructOption {
 	return func(so *StructOptions) { so.EnvPrefix = prefix }
 }
 
-func NamePrefix(prefix string) func(so *StructOptions) {
+func NamePrefix(prefix string) StructOption {
 	return func(so *StructOptions) { so.NamePrefix = prefix }
 }
 
-func FlagStruct(structObj any, options ...func(so *StructOptions)) FlagOption {
+func FlagStruct(structObj any, options ...StructOption) FlagOption {
 	var so StructOptions
+	for _, fn := range globalStructOptions {
+		fn(&so)
+	}
 	for _, fn := range options {
 		fn(&so)
 	}
