@@ -3,12 +3,14 @@ package flags
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/cnk3x/gox/strs"
 )
 
-var rootCmd = &Command{Use: filepath.Base(os.Args[0])}
+var rootCmd = &Command{}
 
 func init() {
-	rootCmd = &Command{Use: filepath.Base(os.Args[0])}
+	rootCmd = &Command{Use: strs.TrimExe(filepath.Base(os.Args[0]))}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
 

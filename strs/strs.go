@@ -109,3 +109,5 @@ func Replace(s, old, new string, n ...int) string {
 // [slices.SortFunc], for example). It is usually clearer and always faster
 // to use the built-in string comparison operators ==, <, >, and so on.
 func Compaare(a, b string) int { return strings.Compare(Lower(a), Lower(b)) }
+
+func TrimExe(s string) string { return TrimSuffix(s, ".exe") }

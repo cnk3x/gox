@@ -20,10 +20,14 @@ type (
 	}
 )
 
-func Struct(options ...StructOption) Option {
+func FlagStructOption(options ...StructOption) Option {
 	return func(*Command) {
 		globalStructOptions = append(globalStructOptions, options...)
 	}
+}
+
+func FlagStruct(structObj any, options ...StructOption) Option {
+	return Flags(Struct(structObj, options...))
 }
 
 func EnvPrefix(prefix string) StructOption {
@@ -34,7 +38,7 @@ func NamePrefix(prefix string) StructOption {
 	return func(so *StructOptions) { so.NamePrefix = prefix }
 }
 
-func FlagStruct(structObj any, options ...StructOption) FlagOption {
+func Struct(structObj any, options ...StructOption) FlagOption {
 	var so StructOptions
 	for _, fn := range globalStructOptions {
 		fn(&so)
