@@ -40,9 +40,11 @@ func HasPrefix(s string, prefix string) bool {
 }
 
 // TrimPrefix returns s without the provided leading prefix string. case-insensitive on Windows.
-func TrimPrefix(s, prefix string) string {
-	if HasPrefix(s, prefix) {
-		return s[len(prefix):]
+func TrimPrefix(s string, prefixes ...string) string {
+	for _, prefix := range prefixes {
+		if HasPrefix(s, prefix) {
+			s = s[len(prefix):]
+		}
 	}
 	return s
 }
@@ -53,9 +55,11 @@ func HasSuffix(s string, suffix string) bool {
 }
 
 // TrimSuffix returns s without the provided trailing suffix string. case-insensitive on Windows.
-func TrimSuffix(s, suffix string) string {
-	if HasSuffix(s, suffix) {
-		return s[:len(s)-len(suffix)]
+func TrimSuffix(s string, suffixes ...string) string {
+	for _, suffix := range suffixes {
+		if HasSuffix(s, suffix) {
+			s = s[:len(s)-len(suffix)]
+		}
 	}
 	return s
 }
