@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"maps"
 	"os"
 	"os/exec"
@@ -268,6 +269,7 @@ func createLoggerFactory() (factory LoggerFactory) {
 				if w = writers[opts.Path]; w == nil {
 					w = Rotate(opts)
 					writers[opts.Path] = w.(io.WriteCloser)
+					slog.Debug("[cmdx] created rotate writer", "path", opts.Path, "size", opts.MaxSize, "backups", opts.MaxBackups)
 				}
 			}
 		}
@@ -287,6 +289,7 @@ func createLoggerFactory() (factory LoggerFactory) {
 				} else {
 					w = std
 				}
+				slog.Debug("[cmdx] created std writer", "std", opts.Std)
 			}
 		}
 		return
